@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salt and Pepper Lab</title>
+<style>
+:root{--bg:#e9eef3;--card:#fff;--ink:#1b2430;--mute:#5b6975;--line:#cfd9e2;--salt:#3a78ad;--pepper:#c0392b;--plain:#6b7782;--ok:#1d7a46;--r:12px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--ink);color:#fff;padding:26px 20px 22px}
+.wrap{max-width:980px;margin:0 auto}
+h1{margin:0 0 6px;font:700 2rem/1.15 Georgia,"Times New Roman",serif}
+header p{margin:0;color:#c3ced8;max-width:64ch}
+main{max-width:980px;margin:0 auto;padding:18px 20px 56px;display:grid;gap:18px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+h2{margin:0 0 4px;font:700 1.3rem/1.2 Georgia,"Times New Roman",serif}
+.sub{margin:0 0 14px;color:var(--mute);font-size:.95rem}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:end}
+label{display:block;font-size:.85rem;color:var(--mute);margin-bottom:3px}
+input[type=text],input[type=password],select{padding:9px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;width:200px;max-width:100%;background:#fff;color:var(--ink)}
+button{padding:10px 16px;border:0;border-radius:8px;background:var(--salt);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+button.dark{background:var(--ink)}button.red{background:var(--pepper)}
+button.ghost{background:transparent;color:var(--salt);border:1px solid var(--salt)}
+button:disabled{opacity:.55;cursor:wait}
+:focus-visible{outline:3px solid #f2b705;outline-offset:2px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:16px}
+.card{border:1px solid var(--line);border-top:6px solid var(--plain);border-radius:10px;padding:12px 14px;background:#fafcfd}
+.card.salt{border-top-color:var(--salt)}.card.pepper{border-top-color:var(--pepper)}
+.card h3{margin:0 0 2px;font-size:1rem}
+.card .how{margin:0 0 8px;color:var(--mute);font-size:.85rem}
+.k{font-size:.75rem;color:var(--mute);margin-top:6px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.78rem;word-break:break-all}
+.msg{margin-top:10px;font-weight:600}.ok{color:var(--ok)}.bad{color:var(--pepper)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mute);font-weight:600}
+.tag{display:inline-block;padding:1px 9px;border-radius:99px;font-size:.78rem;font-weight:600;color:#fff;white-space:nowrap}
+.t-plain{background:var(--plain)}.t-salt{background:var(--salt)}.t-pepper{background:var(--pepper)}
+.chk{display:flex;gap:8px;align-items:center;margin:10px 0;color:var(--ink);font-size:.95rem}
+ul.res{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+ul.res li{border:1px solid var(--line);border-left-width:6px;border-radius:8px;padding:8px 12px}
+ul.res li.cracked{border-left-color:var(--pepper)}ul.res li.safe{border-left-color:var(--ok)}
+.score{margin:12px 0 0;font-weight:700}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>Salt and pepper password lab</h1>
+  <p>Store one password three ways, see what ends up in the database, then attack the stolen data to find out which methods survive.</p>
+</div></header>
+<main>
+  <section aria-labelledby="h1">
+    <h2 id="h1">1. Store a password three ways</h2>
+    <p class="sub">The same username and password are saved by each method. Nothing you type leaves this page.</p>
+    <div class="row">
+      <div><label for="u">Username</label><input id="u" type="text" maxlength="30" value="alice" autocomplete="off"></div>
+      <div><label for="p">Password</label><input id="p" type="password" maxlength="100" value="sunshine" autocomplete="off"></div>
+      <button id="store">Store password</button>
+      <button id="again" class="ghost" disabled>Store again with new salts</button>
+    </div>
+    <div class="msg" id="storeMsg" role="status"></div>
+    <div class="cards" id="cards" aria-live="polite"></div>
+  </section>
+
+  <section aria-labelledby="h2">
+    <h2 id="h2">2. The stolen database</h2>
+    <p class="sub">This is all an attacker gets. No passwords, only methods, salts and hashes. The pepper is not here.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Username</th><th>Method</th><th>Salt</th><th>Stored hash</th></tr></thead>
+      <tbody id="db"></tbody>
+    </table></div>
+    <p class="sub" id="dbEmpty">Nothing stored yet.</p>
+  </section>
+
+  <section aria-labelledby="h3">
+    <h2 id="h3">3. Attack it</h2>
+    <p class="sub">The attacker tries 20 common passwords, using a precomputed table and each account's salt.</p>
+    <label class="chk"><input type="checkbox" id="leak"> Pretend the pepper was stolen as well</label>
+    <button class="red" id="atk">Run attack</button>
+    <div class="score" id="score" role="status"></div>
+    <ul class="res" id="res"></ul>
+  </section>
+
+  <section aria-labelledby="h4">
+    <h2 id="h4">4. Log in</h2>
+    <p class="sub">Checks a password the way a real server would: repeat the calculation and compare.</p>
+    <div class="row">
+      <div><label for="lu">Username</label><input id="lu" type="text" maxlength="30" autocomplete="off"></div>
+      <div><label for="lp">Password</label><input id="lp" type="password" maxlength="100" autocomplete="off"></div>
+      <div><label for="lm">Method</label><select id="lm">
+        <option value="plain">No protection</option><option value="salt">Salt</option><option value="pepper" selected>Salt + pepper</option></select></div>
+      <button class="dark" id="login">Log in</button>
+    </div>
+    <div class="msg" id="loginMsg" role="status"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const enc = new TextEncoder();
+const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+const rand = n => hex(crypto.getRandomValues(new Uint8Array(n)));
+const PEPPER = rand(16); // in a real system this lives in server configuration, not in the page
+const WORDS = ["123456","password","123456789","qwerty","111111","12345678","abc123","password1","iloveyou","admin","welcome","monkey","letmein","dragon","sunshine","football","princess","login","master","starwars"];
+const INFO = {
+  plain:  { name: "No protection", how: "SHA-256 of the password" },
+  salt:   { name: "Salt", how: "SHA-256 of random salt + password" },
+  pepper: { name: "Salt + pepper", how: "PBKDF2 (100,000 rounds), then HMAC with the secret pepper" }
+};
+const $ = id => document.getElementById(id);
+const el = (t, x, c) => { const e = document.createElement(t); if (x !== undefined) e.textContent = x; if (c) e.className = c; return e; };
+const say = (id, t, good) => { const e = $(id); e.textContent = t; e.className = "msg " + (good ? "ok" : "bad"); };
+
+const sha256 = async s => hex(await crypto.subtle.digest("SHA-256", enc.encode(s)));
+async function pbkdf2(pw, salt){
+  const k = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveBits"]);
+  return crypto.subtle.deriveBits({ name: "PBKDF2", salt: enc.encode(salt), iterations: 100000, hash: "SHA-256" }, k, 256);
+}
+async function hmac(key, data){
+  const k = await crypto.subtle.importKey("raw", enc.encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return hex(await crypto.subtle.sign("HMAC", k, data));
+}
+async function compute(mode, pw, salt, pepper){
+  if (mode === "plain") return sha256(pw);
+  if (mode === "salt") return sha256(salt + pw);
+  return hmac(pepper, await pbkdf2(pw, salt));
+}
+
+const db = [];
+function renderDb(){
+  const b = $("db"); b.replaceChildren();
+  for (const r of db){
+    const tr = el("tr"); tr.append(el("td", r.user));
+    const m = el("td"); m.append(el("span", INFO[r.mode].name, "tag t-" + r.mode)); tr.append(m);
+    tr.append(el("td", r.salt || "none", "mono")); tr.append(el("td", r.hash, "mono")); b.append(tr);
+  }
+  $("dbEmpty").hidden = db.length > 0;
+}
+function renderCards(rows){
+  const c = $("cards"); c.replaceChildren();
+  for (const r of rows){
+    const d = el("div", undefined, "card " + r.mode);
+    d.append(el("h3", INFO[r.mode].name), el("p", INFO[r.mode].how, "how"));
+    d.append(el("div", "Salt", "k"), el("div", r.salt || "none", "mono"));
+    d.append(el("div", "Stored hash", "k"), el("div", r.hash, "mono"));
+    c.append(d);
+  }
+}
+async function store(){
+  const user = $("u").value.trim(), pw = $("p").value;
+  if (!user || !pw) return say("storeMsg", "Enter a username and a password.", false);
+  $("store").disabled = $("again").disabled = true;
+  const rows = [];
+  for (const mode of ["plain", "salt", "pepper"]){
+    const salt = mode === "plain" ? "" : rand(8);
+    rows.push({ user, mode, salt, hash: await compute(mode, pw, salt, PEPPER) });
+  }
+  db.push(...rows); renderDb(); renderCards(rows);
+  $("store").disabled = $("again").disabled = false;
+  say("storeMsg", "Stored three records for " + user + ". Press the second button to see which values change.", true);
+}
+$("store").addEventListener("click", store);
+$("again").addEventListener("click", store);
+
+$("atk").addEventListener("click", async () => {
+  if (!db.length) return say("score", "Store a password first.", false);
+  const btn = $("atk"), out = $("res"), leaked = $("leak").checked;
+  btn.disabled = true; out.replaceChildren(); $("score").textContent = "Attacking…"; $("score").className = "score";
+  const table = {}; for (const w of WORDS) table[await sha256(w)] = w;
+  let cracked = 0;
+  for (const r of db){
+    let how = null, pw = null, n = 0;
+    if (table[r.hash]){ how = "table"; pw = table[r.hash]; }
+    else for (const w of WORDS){
+      n++;
+      if (await compute(r.mode, w, r.salt, leaked ? PEPPER : "attacker-guess") === r.hash){ how = "guess"; pw = w; break; }
+    }
+    const li = el("li"); li.className = how ? "cracked" : "safe";
+    const tag = el("span", INFO[r.mode].name, "tag t-" + r.mode);
+    let msg;
+    if (how === "table") msg = " cracked instantly from the precomputed table. Password: " + pw + ".";
+    else if (how === "guess") msg = " cracked in " + n + " guesses using its salt" + (r.mode === "pepper" ? " and the stolen pepper" : "") + ". Password: " + pw + ".";
+    else msg = " survived. " + (r.mode === "pepper" ? "Without the pepper no guess can reproduce the hash." : "No guess matched.");
+    li.append(el("strong", r.user + " "), tag, document.createTextNode(msg));
+    out.append(li); if (how) cracked++;
+  }
+  $("score").textContent = cracked + " of " + db.length + " records cracked.";
+  btn.disabled = false;
+});
+
+$("login").addEventListener("click", async () => {
+  const user = $("lu").value.trim(), pw = $("lp").value, mode = $("lm").value;
+  const r = [...db].reverse().find(x => x.user === user && x.mode === mode);
+  const ok = !!r && !!pw && await compute(mode, pw, r.salt, PEPPER) === r.hash;
+  say("loginMsg", ok ? "Logged in as " + user + "." : "Wrong username or password.", ok);
+});
+
+store(); // start with one example so the page is not empty
+</script>
+</body>
+</html>
